@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trail Flythrough</title>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface2: #1a1a26;
+      --border: rgba(255, 255, 255, 0.07);
+      --accent: #7c6fff;
+      --accent2: #ff9f5a;
+      --text: #f0eeff;
+      --muted: #6b6b8a;
+      --green: #3ddc84;
+      --red: #ff5a5a;
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+    }
+
+    /* LAYOUT */
+    #app {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      grid-template-rows: 100vh;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #map-col {
+      position: relative;
+      overflow: hidden;
+    }
+
+    #sidebar {
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* MAP */
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    #map-loader {
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 20;
+      transition: opacity .4s;
+    }
+
+    #map-loader .spinner {
+      width: 36px;
+      height: 36px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    #map-loader p {
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: .05em;
+    }
+
+    /* DROP SCREEN */
+    #drop-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0a0a0f 0%, #12101f 100%);
+    }
+
+    #drop-box {
+      border: 1.5px dashed rgba(124, 111, 255, 0.4);
+      border-radius: 20px;
+      padding: 56px 48px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+      max-width: 480px;
+      width: 90%;
+      background: rgba(124, 111, 255, 0.03);
+    }
+
+    #drop-box:hover,
+    #drop-box.drag {
+      border-color: var(--accent);
+      background: rgba(124, 111, 255, 0.08);
+    }
+
+    #drop-box .drop-icon {
+      font-size: 48px;
+      margin-bottom: 20px;
+      display: block;
+    }
+
+    #drop-box h2 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    #drop-box p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all .15s;
+      letter-spacing: .03em;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #9488ff;
+      transform: translateY(-1px);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover {
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    #drop-box .btn-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    /* MAP PILLS */
+    .map-pills {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 10;
+      display: flex;
+      gap: 6px;
+    }
+
+    .pill {
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: none;
+      background: rgba(10, 10, 15, 0.75);
+      color: rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: all .15s;
+    }
+
+    .pill:hover {
+      color: #fff;
+      background: rgba(10, 10, 15, 0.9);
+    }
+
+    .pill.on {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* SIDEBAR SECTIONS */
+    .s-head {
+      padding: 24px 24px 0;
+    }
+
+    .s-head h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: .02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .s-head .trail-sub {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      margin-top: 4px;
+    }
+
+    /* STATS */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 16px 24px;
+    }
+
+    .stat {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+
+    .stat-val {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .stat-lbl {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    /* ELEVATION CHART */
+    .chart-wrap {
+      padding: 0 24px 8px;
+    }
+
+    .chart-label {
+      font-size: 10px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 8px;
+    }
+
+    .chart-inner {
+      height: 80px;
+      position: relative;
+    }
+
+    /* PLAYBACK */
+    .playback {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .pb-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .pb-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all .15s;
+      flex-shrink: 0;
+    }
+
+    .pb-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .pb-btn.on {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    input[type=range] {
+      flex: 1;
+      accent-color: var(--accent);
+      height: 4px;
+      cursor: pointer;
+    }
+
+    select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      cursor: pointer;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* EXPORT */
+    .export-section {
+      padding: 16px 24px 24px;
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+    }
+
+    .export-section h3 {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 12px;
+    }
+
+    .export-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .format-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .15s;
+    }
+
+    .format-btn:hover {
+      border-color: var(--accent);
+    }
+
+    .format-btn.selected {
+      border-color: var(--accent);
+      background: rgba(124, 111, 255, 0.12);
+    }
+
+    .format-btn .fmt-icon {
+      font-size: 22px;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .format-btn .fmt-name {
+      font-size: 12px;
+      font-weight: 700;
+      display: block;
+    }
+
+    .format-btn .fmt-dims {
+      font-size: 10px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      display: block;
+      margin-top: 2px;
+    }
+
+    #rec-btn {
+      width: 100%;
+    }
+
+    #rec-btn.recording {
+      background: var(--red);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.75;
+      }
+    }
+
+    .rec-status {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 8px;
+      font-family: 'DM Mono', monospace;
+      min-height: 16px;
+    }
+
+    /* RECORD CANVAS (hidden, used for capture) */
+    #rec-canvas {
+      display: none;
+    }
+
+    /* SCROLLBAR */
+    #sidebar::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    #sidebar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #sidebar::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    /* KEY INPUT */
+    .key-section {
+      padding: 24px;
+    }
+
+    .key-section p {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 12px;
+    }
+
+    .key-section a {
+      color: var(--accent);
+    }
+
+    .key-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 12px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      margin-bottom: 10px;
+    }
+
+    .key-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .key-err {
+      font-size: 11px;
+      color: var(--red);
+      margin-top: 6px;
+      min-height: 14px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <canvas id="rec-canvas"></canvas>
+
+  <div id="app">
+    <!-- MAP COLUMN -->
+    <div id="map-col">
+      <div id="drop-screen">
+        <div id="drop-box" onclick="document.getElementById('file-input').click()" ondragover="dv(event,1)"
+          ondragleave="dv(event,0)" ondrop="dd(event)">
+          <span class="drop-icon">🏔️</span>
+          <h2>Trail Flythrough</h2>
+          <p>Drop your GPX file to fly it in 3D on real satellite terrain.<br>Works with Strava, AllTrails, Garmin,
+            Komoot, Wikiloc.</p>
+          <div class="btn-row">
+            <span class="btn btn-primary"
+              onclick="event.stopPropagation();document.getElementById('file-input').click()">📂 Choose GPX</span>
+            <span class="btn btn-ghost" onclick="event.stopPropagation();loadDemo()">Try demo trail</span>
+          </div>
+          <input type="file" id="file-input" accept=".gpx" onchange="loadFile(this.files[0])">
+        </div>
+      </div>
+      <div id="map-loader" style="display:none">
+        <div class="spinner"></div>
+        <p>Loading 3D terrain…</p>
+      </div>
+      <div id="map"></div>
+      <div class="map-pills" id="pills" style="display:none">
+        <span class="pill on" id="p-sat" onclick="switchStyle('satellite')">Satellite</span>
+        <span class="pill" id="p-out" onclick="switchStyle('outdoor-v2')">Outdoor</span>
+        <span class="pill" id="p-top" onclick="switchStyle('topo-v2')">Topo</span>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+      <!-- KEY SETUP (shown when no key) -->
+      <div id="key-section" class="key-section">
+        <div style="font-size:22px;margin-bottom:12px">🗝️</div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:8px">Maptiler API Key</div>
+        <p>Free key at <a href="https://cloud.maptiler.com/account/keys/" target="_blank">cloud.maptiler.com</a>.<br>
+          In key settings set Allowed HTTP Origins to:<br>
+          <code style="font-size:11px;color:var(--accent)">localhost<br>127.0.0.1</code>
+        </p>
+        <input class="key-input" id="key-input" type="text" placeholder="Paste your Maptiler key…" autocomplete="off"
+          onkeydown="if(event.key==='Enter')saveKey()" />
+        <div style="display:flex;gap:8px">
+          <span class="btn btn-primary" style="flex:1;justify-content:center" onclick="saveKey()">Save & Continue</span>
+        </div>
+        <div class="key-err" id="key-err"></div>
+      </div>
+
+      <!-- TRAIL INFO (hidden until GPX loaded) -->
+      <div id="trail-info" style="display:none">
+        <div class="s-head">
+          <h1 id="tname">Trail</h1>
+          <div class="trail-sub" id="tsub">Loading…</div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-val" id="hd">—</div>
+            <div class="stat-lbl">Distance km</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="he">—</div>
+            <div class="stat-lbl">Elevation m</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="hg">—</div>
+            <div class="stat-lbl">Gain m</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="hs">—</div>
+            <div class="stat-lbl">Speed km/h</div>
+          </div>
+        </div>
+
+        <div class="chart-wrap">
+          <div class="chart-label">Elevation Profile</div>
+          <div class="chart-inner"><canvas id="ec"></canvas></div>
+        </div>
+
+        <div class="playback">
+          <div class="pb-row">
+            <button class="pb-btn" id="bplay" onclick="togglePlay()" title="Play/Pause">▶</button>
+            <button class="pb-btn" onclick="doReset()" title="Reset">↺</button>
+            <input type="range" id="prog" min="0" max="1000" value="0" step="1" oninput="onScrub(+this.value/1000)">
+            <select onchange="SPEED=+this.value">
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="2">2×</option>
+              <option value="5">5×</option>
+            </select>
+          </div>
+          <div class="pb-row" style="margin-bottom:0">
+            <button class="pb-btn on" id="bcam" onclick="toggleFollow()" title="Follow camera">⊕</button>
+            <button class="pb-btn" onclick="fitAll()" title="Overview">⤢</button>
+            <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:12px"
+              onclick="document.getElementById('file-input2').click()">📂 Load new GPX</button>
+            <input type="file" id="file-input2" accept=".gpx" style="display:none" onchange="loadFile(this.files[0])">
+          </div>
+        </div>
+
+        <!-- EXPORT -->
+        <div class="export-section">
+          <h3>Export Video</h3>
+          <div class="export-grid">
+            <div class="format-btn selected" id="fmt-landscape" onclick="selectFormat('landscape')">
+              <span class="fmt-icon">🖥️</span>
+              <span class="fmt-name">Landscape</span>
+              <span class="fmt-dims">1280 × 720</span>
+              <span class="fmt-dims">YouTube / Reels</span>
+            </div>
+            <div class="format-btn" id="fmt-portrait" onclick="selectFormat('portrait')">
+              <span class="fmt-icon">📱</span>
+              <span class="fmt-name">Portrait</span>
+              <span class="fmt-dims">720 × 1280</span>
+              <span class="fmt-dims">IG Story / TikTok</span>
+            </div>
+          </div>
+          <div style="margin-bottom:8px">
+            <select id="rec-speed" style="width:100%;margin-bottom:8px">
+              <option value="2">Record at 2× speed</option>
+              <option value="3" selected>Record at 3× speed</option>
+              <option value="5">Record at 5× speed</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="rec-btn" style="width:100%;justify-content:center"
+            onclick="toggleRecord()">⏺ Start Recording</button>
+          <div class="rec-status" id="rec-status">Select format and hit record</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── STATE ────────────────────────────────────────────────────────────────────
+    let MAP = null, pts = [], elevChart = null;
+    let playing = false, progress = 0, SPEED = 1, followMode = true;
+    let rafId = null, lastTs = 0, markerObj = null, routeReady = false;
+    let KEY = '', exportFormat = 'landscape';
+    let mediaRecorder = null, recChunks = [], isRecording = false;
+
+    // Load saved key
+    window.addEventListener('DOMContentLoaded', () => {
+      const saved = localStorage.getItem('maptiler_key');
+      if (saved) { KEY = saved; document.getElementById('key-input').value = saved; }
+    });
+
+    // ─── UTILS ────────────────────────────────────────────────────────────────────
+    function dv(e, on) { e.preventDefault(); document.getElementById('drop-box').className = on ? 'drag' : ''; }
+    function dd(e) { e.preventDefault(); document.getElementById('drop-box').className = ''; loadFile(e.dataTransfer.files[0]); }
+    function hav(a, b) {
+      const R = 6371, dLa = (b.lat - a.lat) * Math.PI / 180, dLo = (b.lon - a.lon) * Math.PI / 180;
+      const s = Math.sin(dLa / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLo / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+    }
+
+    // ─── KEY ──────────────────────────────────────────────────────────────────────
+    function saveKey() {
+      const k = document.getElementById('key-input').value.trim();
+      if (!k) { document.getElementById('key-err').textContent = 'Please enter your API key.'; return; }
+      KEY = k;
+      localStorage.setItem('maptiler_key', k);
+      document.getElementById('key-err').textContent = '';
+      document.getElementById('key-section').style.display = 'none';
+    }
+
+    // ─── GPX ──────────────────────────────────────────────────────────────────────
+    function loadFile(f) {
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = e => parseGPX(e.target.result, f.name);
+      r.readAsText(f);
+    }
+    function parseGPX(txt, fname) {
+      const doc = new DOMParser().parseFromString(txt, 'text/xml');
+      const nodes = [...doc.querySelectorAll('trkpt,wpt')];
+      if (!nodes.length) { alert('No track points found in this GPX.'); return; }
+      pts = nodes.map(n => ({
+        lat: +n.getAttribute('lat'), lon: +n.getAttribute('lon'),
+        ele: +(n.querySelector('ele')?.textContent || 0),
+        time: n.querySelector('time') ? new Date(n.querySelector('time').textContent) : null
+      }));
+      go(doc.querySelector('name')?.textContent || fname.replace(/\.gpx$/i, ''));
+    }
+    function loadDemo() {
+      if (!KEY) { document.getElementById('key-err').textContent = 'Enter your API key first.'; return; }
+      const N = 280, arr = [];
+      let lat = 47.421, lon = 10.985, ele = 1000;
+      for (let i = 0; i < N; i++) {
+        lat += 0.0006 + Math.random() * 0.0004;
+        lon += 0.0002 + Math.sin(i * 0.17) * 0.0005;
+        ele += Math.sin(i * 0.14) * 28 + Math.random() * 10 - 5;
+        arr.push({ lat, lon, ele: Math.max(900, Math.min(2600, ele)), time: new Date(Date.now() + i * 88000) });
+      }
+      pts = arr; go('Zugspitze demo trail');
+    }
+
+    // ─── START VIEWER ─────────────────────────────────────────────────────────────
+    function go(name) {
+      if (!KEY) { document.getElementById('key-err').textContent = 'Enter your API key first.'; return; }
+      document.getElementById('drop-screen').style.display = 'none';
+      document.getElementById('trail-info').style.display = 'block';
+      document.getElementById('map-loader').style.display = 'flex';
+      document.getElementById('tname').textContent = name;
+      calcStats();
+      buildChart();
+      initMap();
+    }
+
+    function calcStats() {
+      let d = 0, g = 0;
+      for (let i = 1; i < pts.length; i++) { d += hav(pts[i - 1], pts[i]); const dh = pts[i].ele - pts[i - 1].ele; if (dh > 0) g += dh; }
+      document.getElementById('hd').textContent = d.toFixed(2);
+      document.getElementById('hg').textContent = Math.round(g);
+      const dur = pts[0]?.time && pts[pts.length - 1]?.time
+        ? ((pts[pts.length - 1].time - pts[0].time) / 3600000).toFixed(1) + 'h' : '—';
+      document.getElementById('tsub').textContent = `${pts.length} points · ${dur}`;
+    }
+
+    function buildChart() {
+      if (elevChart) elevChart.destroy();
+      const eles = pts.map(p => p.ele);
+      elevChart = new Chart(document.getElementById('ec').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: pts.map((_, i) => i),
+          datasets: [
+            { data: eles, fill: true, tension: 0.3, borderColor: '#7c6fff', backgroundColor: 'rgba(124,111,255,0.1)', borderWidth: 1.5, pointRadius: 0 },
+            { data: Array(pts.length).fill(null), showLine: false, pointRadius: pts.map((_, i) => i === 0 ? 5 : 0), pointBackgroundColor: '#ff9f5a', borderWidth: 0 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: {
+            x: { display: false },
+            y: { ticks: { font: { size: 9 }, maxTicksLimit: 3, color: '#6b6b8a' }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } }
+          },
+          animation: { duration: 0 }
+        }
+      });
+    }
+    function updChart(idx) {
+      if (!elevChart) return;
+      const eles = pts.map(p => p.ele);
+      const d = Array(pts.length).fill(null);
+      d[idx] = eles[idx];
+      elevChart.data.datasets[1].data = d;
+      elevChart.data.datasets[1].pointRadius = pts.map((_, k) => k === idx ? 5 : 0);
+      elevChart.update('none');
+    }
+
+    // ─── MAP ──────────────────────────────────────────────────────────────────────
+    function styleUrl(s) { return `https://api.maptiler.com/maps/${s}/style.json?key=${KEY}`; }
+
+    function initMap() {
+      if (MAP) { MAP.remove(); MAP = null; routeReady = false; }
+      const lons = pts.map(p => p.lon), lats = pts.map(p => p.lat);
+      const cx = (Math.min(...lons) + Math.max(...lons)) / 2;
+      const cy = (Math.min(...lats) + Math.max(...lats)) / 2;
+      MAP = new maplibregl.Map({
+        container: 'map', style: styleUrl('satellite'),
+        center: [cx, cy], zoom: 13, pitch: 60, bearing: 0,
+        antialias: true, maxPitch: 85
+      });
+      MAP.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+      MAP.on('load', onMapLoad);
+      MAP.on('error', e => {
+        console.error(e);
+        document.getElementById('map-loader').innerHTML = '<p style="color:#ff5a5a">⚠ Map error — check API key &amp; allowed origins (localhost)</p>';
+      });
+    }
+
+    function onMapLoad() {
+      document.getElementById('map-loader').style.display = 'none';
+      document.getElementById('pills').style.display = 'flex';
+      MAP.addSource('maptiler-dem', { type: 'raster-dem', url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${KEY}`, tileSize: 256, encoding: 'mapbox' });
+      MAP.setTerrain({ source: 'maptiler-dem', exaggeration: 1.8 });
+      MAP.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0, 60], 'sky-atmosphere-sun-intensity': 15 } });
+      addRouteLayers();
+      fitAll();
+      doReset();
+      if (rafId) cancelAnimationFrame(rafId);
+      lastTs = 0; rafId = requestAnimationFrame(tick);
+    }
+
+    function addRouteLayers() {
+      if (!MAP || routeReady) return;
+      routeReady = true;
+      const coords = pts.map(p => [p.lon, p.lat, p.ele]);
+      MAP.addSource('full-route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } } });
+      MAP.addLayer({ id: 'full-route-glow', type: 'line', source: 'full-route', paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.15, 'line-blur': 4 } });
+      MAP.addLayer({ id: 'full-route-line', type: 'line', source: 'full-route', paint: { 'line-color': '#7c6fff', 'line-width': 3, 'line-opacity': 0.7 } });
+      MAP.addSource('done-route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [coords[0], coords[0]] } } });
+      MAP.addLayer({ id: 'done-route-line', type: 'line', source: 'done-route', paint: { 'line-color': '#ff9f5a', 'line-width': 4, 'line-opacity': 1 } });
+      if (markerObj) { markerObj.remove(); }
+      const el = document.createElement('div');
+      el.style.cssText = 'width:20px;height:20px;background:#ff9f5a;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 12px rgba(255,159,90,.6)';
+      markerObj = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([pts[0].lon, pts[0].lat]).addTo(MAP);
+    }
+
+    function switchStyle(s) {
+      ['sat', 'out', 'top'].forEach(k => document.getElementById('p-' + k).classList.remove('on'));
+      const m = { satellite: 'p-sat', 'outdoor-v2': 'p-out', 'topo-v2': 'p-top' };
+      if (m[s]) document.getElementById(m[s]).classList.add('on');
+      MAP.setStyle(styleUrl(s));
+      MAP.once('style.load', () => {
+        MAP.addSource('maptiler-dem', { type: 'raster-dem', url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${KEY}`, tileSize: 256, encoding: 'mapbox' });
+        MAP.setTerrain({ source: 'maptiler-dem', exaggeration: 1.8 });
+        MAP.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0, 60], 'sky-atmosphere-sun-intensity': 15 } });
+        routeReady = false; addRouteLayers(); updateScene(progress);
+      });
+    }
+
+    // ─── ANIMATION ────────────────────────────────────────────────────────────────
+    function getPosAt(t) {
+      const n = pts.length, raw = t * (n - 1), i = Math.min(n - 2, Math.floor(raw)), f = raw - i;
+      return { lon: pts[i].lon + (pts[i + 1].lon - pts[i].lon) * f, lat: pts[i].lat + (pts[i + 1].lat - pts[i].lat) * f, ele: pts[i].ele + (pts[i + 1].ele - pts[i].ele) * f, i };
+    }
+    function getBearing(i) {
+      const j = Math.min(i + 5, pts.length - 1);
+      if (j === i) return MAP?.getBearing() || 0;
+      return (Math.atan2(pts[j].lon - pts[i].lon, pts[j].lat - pts[i].lat) * 180 / Math.PI + 360) % 360;
+    }
+    function updateScene(t) {
+      if (!MAP || !pts.length || !markerObj) return;
+      const { lon, lat, ele, i } = getPosAt(t);
+      markerObj.setLngLat([lon, lat]);
+      const done = pts.slice(0, i + 1).map(p => [p.lon, p.lat, p.ele]);
+      done.push([lon, lat, ele]);
+      if (MAP.getSource('done-route')) MAP.getSource('done-route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: done } });
+      if (followMode) MAP.easeTo({ center: [lon, lat], bearing: getBearing(i), pitch: 65, zoom: 15, duration: 600, easing: x => x });
+      document.getElementById('he').textContent = Math.round(ele);
+      document.getElementById('prog').value = Math.round(t * 1000);
+      updChart(Math.min(pts.length - 1, Math.round(t * (pts.length - 1))));
+      if (i > 0 && pts[i].time && pts[i - 1].time) {
+        const d = hav(pts[i - 1], pts[i]), dt = (pts[i].time - pts[i - 1].time) / 3600000;
+        document.getElementById('hs').textContent = dt > 0 ? Math.round(Math.min(999, d / dt) * 10) / 10 : '—';
+      }
+    }
+    function tick(ts) {
+      rafId = requestAnimationFrame(tick);
+      if (!playing) return;
+      if (lastTs === 0) { lastTs = ts; return; }
+      const dt = Math.min(0.05, (ts - lastTs) / 1000);
+      lastTs = ts;
+      progress += dt * SPEED * (1 / Math.max(8, pts.length / 20));
+      if (progress >= 1) { progress = 1; stopPlay(); }
+      updateScene(progress);
+    }
+    function togglePlay() { playing ? stopPlay() : startPlay(); }
+    function startPlay() { if (progress >= 0.999) doReset(); playing = true; lastTs = 0; document.getElementById('bplay').textContent = '⏸'; }
+    function stopPlay() { playing = false; document.getElementById('bplay').textContent = '▶'; }
+    function doReset() { stopPlay(); progress = 0; document.getElementById('prog').value = 0; if (pts.length) updateScene(0); }
+    function onScrub(t) { progress = t; updateScene(t); }
+    function toggleFollow() { followMode = !followMode; document.getElementById('bcam').classList.toggle('on', followMode); }
+    function fitAll() {
+      if (!MAP || !pts.length) return;
+      const lons = pts.map(p => p.lon), lats = pts.map(p => p.lat);
+      MAP.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 60, pitch: 50, bearing: 0, duration: 1200 });
+    }
+
+    // ─── EXPORT VIDEO ─────────────────────────────────────────────────────────────
+    function selectFormat(f) {
+      exportFormat = f;
+      document.getElementById('fmt-landscape').classList.toggle('selected', f === 'landscape');
+      document.getElementById('fmt-portrait').classList.toggle('selected', f === 'portrait');
+    }
+
+    function toggleRecord() {
+      if (isRecording) stopRecording();
+      else startRecording();
+    }
+
+    function startRecording() {
+      if (!pts.length) { alert('Load a GPX first.'); return; }
+      if (!MAP) { alert('Map not ready.'); return; }
+
+      const isPortrait = exportFormat === 'portrait';
+      const W = isPortrait ? 720 : 1280, H = isPortrait ? 1280 : 720;
+
+      const recCanvas = document.getElementById('rec-canvas');
+      recCanvas.width = W; recCanvas.height = H;
+      const ctx = recCanvas.getContext('2d');
+
+      // Check support
+      if (!recCanvas.captureStream) { alert('Your browser does not support canvas recording. Use Chrome.'); return; }
+
+      const mapCanvas = document.querySelector('#map canvas');
+      if (!mapCanvas) { alert('Map canvas not found.'); return; }
+
+      const recSpd = +document.getElementById('rec-speed').value;
+      const savedSpeed = SPEED;
+      const savedFollow = followMode;
+
+      // Reset to start
+      doReset();
+      followMode = true;
+      SPEED = recSpd;
+
+      // Draw loop onto record canvas
+      let recRaf;
+      function drawFrame() {
+        if (!isRecording) return;
+        ctx.clearRect(0, 0, W, H);
+        // Map
+        try {
+          if (isPortrait) {
+            // Center-crop landscape map to portrait
+            const mW = mapCanvas.width, mH = mapCanvas.height;
+            const cropW = mH * (W / H), cropX = (mW - cropW) / 2;
+            ctx.drawImage(mapCanvas, cropX, 0, cropW, mH, 0, 0, W, H);
+          } else {
+            ctx.drawImage(mapCanvas, 0, 0, W, H);
+          }
+        } catch (e) { }
+
+        // Overlay: dark gradient bottom
+        const grad = ctx.createLinearGradient(0, H * 0.6, 0, H);
+        grad.addColorStop(0, 'rgba(10,10,15,0)');
+        grad.addColorStop(1, 'rgba(10,10,15,0.85)');
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+        // Stats overlay
+        const p = getPosAt(progress);
+        ctx.fillStyle = 'rgba(10,10,15,0.6)';
+        ctx.beginPath();
+        const bx = 24, by = H - 130, bw = isPortrait ? W - 48 : 400, bh = 110;
+        roundRect(ctx, bx, by, bw, bh, 12);
+        ctx.fill();
+
+        ctx.fillStyle = '#f0eeff';
+        ctx.font = `700 ${isPortrait ? 28 : 22}px Syne,sans-serif`;
+        const name = document.getElementById('tname').textContent;
+        ctx.fillText(name.length > 30 ? name.slice(0, 30) + '…' : name, bx + 18, by + 36);
+
+        ctx.font = `400 ${isPortrait ? 20 : 15}px DM Mono,monospace`;
+        ctx.fillStyle = '#6b6b8a';
+        const distVal = document.getElementById('hd').textContent;
+        const gainVal = document.getElementById('hg').textContent;
+        const eleVal = Math.round(p.ele || 0);
+        ctx.fillText(`${distVal} km  ·  +${gainVal}m gain  ·  ${eleVal}m elev`, bx + 18, by + 66);
+
+        // Progress bar
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        roundRect(ctx, bx + 18, by + 82, bw - 36, 6, 3); ctx.fill();
+        ctx.fillStyle = '#7c6fff';
+        roundRect(ctx, bx + 18, by + 82, Math.max(6, (bw - 36) * progress), 6, 3); ctx.fill();
+
+        // Watermark
+        ctx.font = `600 ${isPortrait ? 16 : 13}px Syne,sans-serif`;
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fillText('Trail Flythrough', W - isPortrait ? 160 : 140, H - 16);
+
+        recRaf = requestAnimationFrame(drawFrame);
+      }
+
+      function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath(); }
+
+      const stream = recCanvas.captureStream(30);
+      recChunks = [];
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 8000000 });
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        cancelAnimationFrame(recRaf);
+        const blob = new Blob(recChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `trail-${exportFormat}-${Date.now()}.webm`; a.click();
+        URL.revokeObjectURL(url);
+        SPEED = savedSpeed; followMode = savedFollow;
+        document.getElementById('rec-btn').textContent = '⏺ Start Recording';
+        document.getElementById('rec-btn').classList.remove('recording');
+        document.getElementById('rec-status').textContent = '✅ Video saved!';
+        isRecording = false;
+      };
+
+      mediaRecorder.start(100);
+      isRecording = true;
+      drawFrame();
+      startPlay();
+
+      document.getElementById('rec-btn').textContent = '⏹ Stop Recording';
+      document.getElementById('rec-btn').classList.add('recording');
+      document.getElementById('rec-status').textContent = `Recording ${W}×${H} at ${recSpd}×…`;
+
+      // Auto-stop when animation ends
+      const origStop = stopPlay;
+      const checkDone = setInterval(() => {
+        if (progress >= 0.999) { clearInterval(checkDone); setTimeout(stopRecording, 800); }
+      }, 500);
+    }
+
+    function stopRecording() {
+      if (!isRecording || !mediaRecorder) return;
+      stopPlay();
+      mediaRecorder.stop();
+      document.getElementById('rec-status').textContent = 'Processing video…';
+    }
+  </script>
+</body>
+
+</html>
