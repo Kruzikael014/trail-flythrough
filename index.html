@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trail Flythrough</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/public/icon.svg">
+  <meta name="theme-color" content="#7c6fff">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <canvas id="rec-canvas"></canvas>
+
+  <div id="app">
+    <!-- MAP COLUMN -->
+    <div id="map-col">
+      <div id="drop-screen">
+        <div id="drop-box">
+          <span class="drop-icon">🏔️</span>
+          <h2>Trail Flythrough</h2>
+          <p>Drop your GPX file to fly it in 3D on real satellite terrain.<br>Works with Strava, AllTrails, Garmin, Komoot, Wikiloc.</p>
+          <div class="btn-row">
+            <span class="btn btn-primary" id="choose-gpx-btn">📂 Choose GPX</span>
+          </div>
+          <input type="file" id="file-input" accept=".gpx">
+        </div>
+      </div>
+
+      <div id="map-loader" style="display:none">
+        <div class="spinner"></div>
+        <p>Loading 3D terrain…</p>
+      </div>
+
+      <div id="map"></div>
+
+      <div class="map-pills" id="pills" style="display:none">
+        <span class="pill on" id="p-sat" data-style="satellite">Satellite</span>
+        <span class="pill" id="p-out" data-style="outdoor-v2">Outdoor</span>
+        <span class="pill" id="p-top" data-style="topo-v2">Topo</span>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+
+      <!-- KEY SETUP (shown only when no env key) -->
+      <div id="key-section" class="collapsible-section">
+        <button class="section-toggle" data-target="key-body">
+          <span class="section-title">🗝️ Maptiler API Key</span>
+          <span class="toggle-arrow">▾</span>
+        </button>
+        <div class="section-body" id="key-body">
+          <div class="section-inner">
+            <p>Free key at <a href="https://cloud.maptiler.com/account/keys/" target="_blank">cloud.maptiler.com</a>.<br>
+              In key settings set Allowed HTTP Origins to:<br>
+              <code style="font-size:11px;color:var(--accent)">localhost<br>127.0.0.1</code>
+            </p>
+            <input class="key-input" id="key-input" type="text" placeholder="Paste your Maptiler key…" autocomplete="off" />
+            <div style="display:flex;gap:8px">
+              <span class="btn btn-primary" id="save-key-btn" style="flex:1;justify-content:center">Save & Continue</span>
+            </div>
+            <div class="key-err" id="key-err"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRAIL INFO (hidden until GPX loaded) -->
+      <div id="trail-info" style="display:none">
+
+        <!-- Trail metadata: name/sub is the toggle header, stats+chart+playback collapse -->
+        <div class="collapsible-section">
+          <button class="section-toggle" data-target="trail-body">
+            <span>
+              <div class="section-title" id="tname">Trail</div>
+              <div class="trail-sub" id="tsub">Loading…</div>
+            </span>
+            <span class="toggle-arrow">▾</span>
+          </button>
+          <div class="section-body" id="trail-body">
+            <div class="stats">
+              <div class="stat">
+                <div class="stat-val" id="hd">—</div>
+                <div class="stat-lbl">Distance km</div>
+              </div>
+              <div class="stat">
+                <div class="stat-val" id="he">—</div>
+                <div class="stat-lbl">Elevation m</div>
+              </div>
+              <div class="stat">
+                <div class="stat-val" id="hg">—</div>
+                <div class="stat-lbl">Gain m</div>
+              </div>
+              <div class="stat">
+                <div class="stat-val" id="hs">—</div>
+                <div class="stat-lbl">Speed km/h</div>
+              </div>
+            </div>
+
+            <div class="chart-wrap">
+              <div class="chart-label">Elevation Profile</div>
+              <div class="chart-inner"><canvas id="ec"></canvas></div>
+            </div>
+
+            <div class="playback">
+              <div class="pb-row">
+                <button class="pb-btn" id="bplay" title="Play/Pause">▶</button>
+                <button class="pb-btn" id="breset" title="Reset">↺</button>
+                <input type="range" id="prog" min="0" max="1000" value="0" step="1">
+                <select id="speed-select">
+                  <option value="0.25">0.25×</option>
+                  <option value="0.5">0.5×</option>
+                  <option value="0.75">0.75×</option>
+                  <option value="1" selected>1×</option>
+                  <option value="1.25">1.25×</option>
+                  <option value="1.5">1.5×</option>
+                </select>
+              </div>
+              <div class="pb-row" style="margin-bottom:0">
+                <button class="pb-btn on" id="bcam" title="Follow camera">⊕</button>
+                <button class="pb-btn" id="boverview" title="Overview">⤢</button>
+                <button class="btn btn-ghost" id="load-new-btn" style="flex:1;justify-content:center;font-size:12px">📂 Load new GPX</button>
+                <input type="file" id="file-input2" accept=".gpx" style="display:none">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EXPORT VIDEO -->
+        <div class="collapsible-section export-section">
+          <button class="section-toggle" data-target="export-body">
+            <span class="section-title">Export Video</span>
+            <span class="toggle-arrow">▾</span>
+          </button>
+          <div class="section-body" id="export-body">
+            <div class="section-inner">
+              <div class="export-grid">
+                <div class="format-btn selected" id="fmt-landscape" data-format="landscape">
+                  <span class="fmt-icon">🖥️</span>
+                  <span class="fmt-name">Landscape</span>
+                  <span class="fmt-dims">1280 × 720</span>
+                  <span class="fmt-dims">YouTube / Reels</span>
+                </div>
+                <div class="format-btn" id="fmt-portrait" data-format="portrait">
+                  <span class="fmt-icon">📱</span>
+                  <span class="fmt-name">Portrait</span>
+                  <span class="fmt-dims">720 × 1280</span>
+                  <span class="fmt-dims">IG Story / TikTok</span>
+                </div>
+              </div>
+              <div style="margin-bottom:8px">
+                <select id="container-format" style="width:100%;margin-bottom:8px">
+                  <option value="webm">Export as WebM (instant)</option>
+                  <option value="mp4">Export as MP4 (converts via ffmpeg)</option>
+                </select>
+                <select id="overlay-theme" style="width:100%">
+                  <option value="default">Overlay: Default (card + stats)</option>
+                  <option value="minimal">Overlay: Minimal (name + bar only)</option>
+                  <option value="bold">Overlay: Bold (large text, full width)</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" id="rec-btn" style="width:100%;justify-content:center">⏺ Start Recording</button>
+              <div class="rec-status" id="rec-status">Select format and hit record</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

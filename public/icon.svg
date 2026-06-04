@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0a0a0f"/>
+  <!-- Mountain silhouette -->
+  <polygon points="120,380 256,140 392,380" fill="#1a1a2e"/>
+  <polygon points="200,380 310,200 420,380" fill="#12121a"/>
+  <!-- Trail line (orange) -->
+  <polyline points="110,370 175,290 230,310 270,240 320,260 380,180 420,200"
+            fill="none" stroke="#ff9f5a" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Marker dot -->
+  <circle cx="420" cy="200" r="18" fill="#ff9f5a"/>
+  <circle cx="420" cy="200" r="10" fill="#fff"/>
+</svg>
