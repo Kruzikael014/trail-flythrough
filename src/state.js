@@ -18,9 +18,11 @@ export const state = {
   containerFormat: 'webm',
   introRunning: false,
   overlayTheme: 'default',
-  camBear: null,       // exponentially-smoothed follow-cam bearing
-  camPitch: null,      // exponentially-smoothed terrain-aware pitch
-  camFront: false,     // true when camera flips to face runner from front (terrain blocking from behind)
-  blockScore: 0,       // seconds of sustained terrain blocking — drives front-cam switch
-  userLastRotated: 0,  // timestamp of last manual rotation — pauses bearing/pitch follow
+  totalDistKm: 1,       // total route distance in km — set by calcStats(); used for fixed-speed tick
+  camBear: null,        // exponentially-smoothed follow-cam bearing
+  camPitch: null,       // exponentially-smoothed terrain-aware pitch
+  camZoom: null,        // smoothed zoom — pulls back when terrain is blocking
+  camBearOffset: 0,     // smooth lateral nudge (degrees) to peek around left/right ridges
+  blockScore: 0,        // seconds of sustained terrain blocking — drives pitch/zoom avoidance
+  userLastRotated: 0,   // timestamp of last manual rotation — pauses bearing/pitch follow
 };

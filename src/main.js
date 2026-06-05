@@ -73,6 +73,7 @@ function calcStats() {
     const dh = state.pts[i].ele - state.pts[i - 1].ele;
     if (dh > 0) g += dh;
   }
+  state.totalDistKm = Math.max(0.1, d); // guard against zero-distance edge case
   document.getElementById('hd').textContent = d.toFixed(2);
   document.getElementById('hg').textContent = Math.round(g);
   const first = state.pts[0], last = state.pts[state.pts.length - 1];
