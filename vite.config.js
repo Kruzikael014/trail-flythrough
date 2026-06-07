@@ -6,7 +6,6 @@ const coopHeaders = {
 };
 
 export default defineConfig({
-  server: { headers: coopHeaders },
   preview: { headers: coopHeaders },
   build: {
     outDir: 'dist',

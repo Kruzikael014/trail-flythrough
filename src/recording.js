@@ -159,6 +159,53 @@ const overlayDrawers = {
   bold: drawOverlayBold,
 };
 
+// ─── RUNNER MARKER ON CANVAS ──────────────────────────────────────────────────
+// The MapLibre runner is a DOM element — invisible to canvas capture and hidden
+// by 3D terrain in the WebGL depth buffer. This redraws it on the 2D overlay
+// canvas so it is always on top of terrain, always visible in the recording.
+
+function drawRunnerMarker(ctx, W, H, mapCanvas) {
+  if (!state.MAP || !state.pts.length) return;
+
+  let pt;
+  try {
+    const { lon, lat } = getPosAt(state.progress);
+    pt = state.MAP.project([lon, lat]);
+  } catch { return; }
+
+  // Scale from map CSS pixels to recording canvas pixels
+  const dpr  = window.devicePixelRatio || 1;
+  const mapW = mapCanvas.width  / dpr;
+  const mapH = mapCanvas.height / dpr;
+  const x = pt.x * (W / mapW);
+  const y = pt.y * (H / mapH);
+
+  if (x < -30 || x > W + 30 || y < -30 || y > H + 30) return; // off-screen
+
+  const r = Math.max(8, Math.round(Math.min(W, H) / 58)); // ~12 px at 720 px
+
+  // Animated pulse ring (matches the CSS animation period of 1.4 s)
+  const phase    = (performance.now() % 1400) / 1400;
+  const expand   = Math.sin(phase * Math.PI * 2) * 0.5 + 0.5;
+  const ringR    = r + 3 + expand * 7;
+  const ringAlpha = (0.35 * (1 - expand * 0.8)).toFixed(2);
+
+  ctx.beginPath();
+  ctx.arc(x, y, ringR, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(61,220,132,${ringAlpha})`;
+  ctx.lineWidth   = 2.5;
+  ctx.stroke();
+
+  // Green disc
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle   = '#3ddc84';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth   = 2.5;
+  ctx.stroke();
+}
+
 // ─── EXPORT FORMAT / RECORDING ────────────────────────────────────────────────
 
 export function selectFormat(f) {
@@ -276,6 +323,7 @@ export function startRecording() {
     } catch (e) { console.warn('[rec] drawImage failed:', e); }
 
     drawOverlay(ctx, W, H, isPortrait, state.progress);
+    drawRunnerMarker(ctx, W, H, mapCanvas); // always on top of terrain + overlay
 
     recRafRef.id = requestAnimationFrame(drawFrame);
   }

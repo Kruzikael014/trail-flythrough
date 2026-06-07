@@ -25,4 +25,5 @@ export const state = {
   camBearOffset: 0,     // smooth lateral nudge (degrees) to peek around left/right ridges
   blockScore: 0,        // seconds of sustained terrain blocking — drives pitch/zoom avoidance
   userLastRotated: 0,   // timestamp of last manual rotation — pauses bearing/pitch follow
+  camEasing: false,     // true while the initial easeTo zoom-in is running — blocks per-frame jumpTo
 };

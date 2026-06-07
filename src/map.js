@@ -75,6 +75,7 @@ export function initMap() {
     antialias: true,
     maxPitch: 85,
     preserveDrawingBuffer: true,
+    fadeDuration: 100,   // tiles snap in quickly — reduces the black-flash window
   });
   state.MAP.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
 
@@ -102,7 +103,6 @@ export function initMap() {
 }
 
 function onMapLoad() {
-  document.getElementById('map-loader').style.display = 'none';
   document.getElementById('pills').style.display = 'flex';
   try {
     ensureTerrainSource();
@@ -115,6 +115,20 @@ function onMapLoad() {
   if (state.rafId) cancelAnimationFrame(state.rafId);
   state.lastTs = 0;
   state.rafId = requestAnimationFrame(tick);
+
+  // Keep the loading overlay up until the map is fully rendered (all tiles loaded).
+  // MapLibre's 'idle' event fires only when there are no pending tile fetches and no
+  // animations — the user sees a clean, fully-rendered map instead of a blank/blinking one.
+  // 5-second fallback so a slow network doesn't block the intro forever.
+  const fallbackTimer = setTimeout(startIntro, 5000);
+  state.MAP.once('idle', () => {
+    clearTimeout(fallbackTimer);
+    startIntro();
+  });
+}
+
+function startIntro() {
+  document.getElementById('map-loader').style.display = 'none';
   runIntro();
 }
 
@@ -127,6 +141,10 @@ function runIntro() {
   const DURATION = 3500;
   const coords = state.pts.map(p => [p.lon, p.lat]);
   const start = performance.now();
+
+  // Tilt from the flat overview (0°) to cinematic 3D (45°) while the route draws.
+  // Runs as a MapLibre easeTo in parallel with the rAF route-drawing loop.
+  state.MAP.easeTo({ pitch: 45, duration: DURATION, easing: easeInOut });
 
   function skipIntro() {
     state.introRunning = false;
@@ -212,7 +230,8 @@ function addRouteLayers() {
 
   if (state.markerObj) { try { state.markerObj.remove(); } catch (e) {} }
   const el = document.createElement('div');
-  el.style.cssText = 'width:20px;height:20px;background:#ff9f5a;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 12px rgba(255,159,90,.6)';
+  el.className = 'runner-marker';
+  el.style.cssText = 'width:20px;height:20px;background:#3ddc84;border:2.5px solid rgba(255,255,255,0.85);border-radius:50%;box-shadow:0 0 0 4px rgba(61,220,132,.25),0 2px 14px rgba(61,220,132,.55)';
   try {
     state.markerObj = new maplibregl.Marker({ element: el, anchor: 'center' })
       .setLngLat([state.pts[0].lon, state.pts[0].lat])
